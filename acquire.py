@@ -94,9 +94,7 @@ def get_iris_data():
 
 
 def new_telco_data():
-    '''
-    This function reads the iris data from the Codeup db into a df.
-    '''
+  
     sql_query = """
                 select * from customers
                 join contract_types using (contract_type_id)
