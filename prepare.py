@@ -1,5 +1,7 @@
 import pandas as pd 
 import numpy as np
+import os
+from env import get_db_url
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 
@@ -65,6 +67,39 @@ def prep_iris(df):
 
 
     ############## TELCO DATA PREPARE#########
+def new_telco_data():
+    '''
+    This function reads the telco data and turns it into a dataframe.
+    '''
+    sql_query = """
+                select * from customers
+                join contract_types using (contract_type_id)
+                join internet_service_types using (internet_service_type_id)
+                join payment_types using (payment_type_id)
+                """
+    url = get_db_url('telco_churn')
+    # Read in DataFrame from Codeup db.
+    df = pd.read_sql(sql_query, url)
+    
+    return df
+
+def get_telco_data():
+    '''
+      reads telco data, caches it to a local file if there is not one, and returns a df
+    '''
+    if os.path.isfile('telco.csv'):
+        
+        # If there is a csv file read the data.
+        df = pd.read_csv('telco.csv', index_col=0)
+        
+    else:
+        
+        df = new_telco_data()
+        
+        # Cache data if there is not a csv file already
+        df.to_csv('telco.csv')
+        
+    return df
 
 
 def split_telco_data(df):
@@ -72,10 +107,43 @@ def split_telco_data(df):
         train_validate, test = train_test_split(df, test_size= .2, 
                                                     random_state= 123, 
                                                     stratify=df.churn)
-        train, validate = train_test_split(train_validate, test_size= .3, 
+        train, validate = train_test_split(train_validate, test_size= .2, 
                                                             random_state= 123, 
                                                             stratify= train_validate.churn)
         return train, validate, test
+
+
+def tenure_binned(i):
+    if i['tenure'] < 6: 
+        return"1 - 5"
+    elif i['tenure'] > 5 and i['tenure'] < 11:
+        return "6 - 10"
+    elif i['tenure'] > 10 and i['tenure'] <16:
+        return "11 - 15"
+    elif i['tenure'] > 15 and i['tenure'] < 21:
+        return "16 - 20"
+    elif i['tenure'] > 20 and i['tenure']< 26:
+        return "21 - 25" 
+    elif i['tenure'] >25 and i['tenure']<31: 
+        return"26 - 30" 
+    elif i['tenure'] >30 and i['tenure']< 36: 
+        return "31 - 35" 
+    elif i['tenure'] >35 and i['tenure']< 41: 
+        return "36 - 40" 
+    elif i['tenure'] >40 and i['tenure']< 46: 
+        return "41 - 45" 
+    elif i['tenure'] >45 and i['tenure']< 51: 
+        return "46 - 50" 
+    elif i['tenure'] >50 and i['tenure']< 56: 
+        return "51 - 55" 
+    elif i['tenure'] >55 and i['tenure']< 61: 
+        return "56 - 60" 
+    elif i['tenure'] >60 and i['tenure']< 66: 
+        return "61 - 65" 
+    elif i['tenure'] >65 and i['tenure']< 71: 
+        return "66 - 70" 
+    elif i['tenure'] >70:
+        return"71+" ;
 
 
 
@@ -111,10 +179,59 @@ def prep_telco_data(df):
     
         df = pd.concat([df, dummy_df], axis = 1)
     
-        return df
+        df['tenure_binned'] = df.apply(lambda x: tenure_binned(x), axis = 1)
+        
+        train, validate, test = split_telco_data(df)
+       
+        return train, validate, test
+
      
 
 
+
+def wrangle_telco():
+    df = get_telco_data()
+    df = prep_telco_data(df)
+    return df
+
+
+
+def model_telco_data(df):
+    #drop columns that aren't necessary 
+    
+        columns = ['customer_id', 'payment_type_id', 'internet_service_type_id' , 'contract_type_id']
+        df.drop(columns, inplace = True, axis = 1)
+    
+    #fix total charges
+    
+        df['total_charges'] = df['total_charges'].str.strip()
+        df = df[df.total_charges != '']
+        df['total_charges'] = df.total_charges.astype(float)
+    
+    #get dummy variables
+        dummy_df = pd.get_dummies(df[['gender', \
+                                    'partner', \
+                                    'dependents', \
+                                    'phone_service', \
+                                    'paperless_billing', \
+                                    'churn', \
+                                    'multiple_lines', \
+                                    'online_security', \
+                                    'device_protection', \
+                                    'tech_support', \
+                                    'streaming_tv', \
+                                     'streaming_movies', \
+                                     'contract_type', \
+                                     'internet_service_type', \
+                                     'payment_type']], dummy_na=False, \
+                                  drop_first=True)
+    
+        df = pd.concat([df, dummy_df], axis = 1)
+    
+        df['tenure_binned'] = df.apply(lambda x: tenure_binned(x), axis = 1)
+        
+       
+        return df
 
 
     ########### Titanic Data ############
